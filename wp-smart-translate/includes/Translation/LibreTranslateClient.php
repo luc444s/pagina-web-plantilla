@@ -34,6 +34,12 @@ final class LibreTranslateClient implements ApiClient
         $timeout = (int) $this->config->get('api.timeout', 8);
         $maxRetries = (int) $this->config->get('api.max_retries', 1);
 
+        // Contrato nativo de LibreTranslate.
+        $payload = [
+            'q' => $texts,
+            'source' => $source,
+            'target' => $target,
+            'format' => 'text',
         $payload = [
             'texts' => $texts,
             'source' => $source,
@@ -70,6 +76,33 @@ final class LibreTranslateClient implements ApiClient
             }
 
             $body = json_decode((string) $rawBody, true);
+            if (! is_array($body) || ! isset($body['translatedText']) || ! is_array($body['translatedText'])) {
+                $this->logger->warning('Respuesta de LibreTranslate inválida: falta translatedText como array.');
+                continue;
+            }
+
+            $translatedTexts = array_values($body['translatedText']);
+            if (count($translatedTexts) !== count($texts)) {
+                $this->logger->warning(
+                    sprintf(
+                        'Cantidad de traducciones inconsistente. Enviadas:%d Recibidas:%d',
+                        count($texts),
+                        count($translatedTexts)
+                    )
+                );
+                continue;
+            }
+
+            // Reconstruye el mapa esperado por el pipeline interno: [original => translated].
+            $translations = [];
+            foreach ($texts as $index => $originalText) {
+                $translatedValue = $translatedTexts[$index] ?? '';
+
+                if (! is_string($translatedValue) || $translatedValue === '') {
+                    continue;
+                }
+
+                $translations[$originalText] = $translatedValue;
             if (! is_array($body) || ! isset($body['translations']) || ! is_array($body['translations'])) {
                 $this->logger->warning('Respuesta de traducción inválida o sin estructura esperada.');
                 continue;
