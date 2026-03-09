@@ -40,6 +40,10 @@ final class LibreTranslateClient implements ApiClient
             'source' => $source,
             'target' => $target,
             'format' => 'text',
+        $payload = [
+            'texts' => $texts,
+            'source' => $source,
+            'target' => $target,
         ];
 
         $headers = ['Content-Type' => 'application/json'];
@@ -99,6 +103,18 @@ final class LibreTranslateClient implements ApiClient
                 }
 
                 $translations[$originalText] = $translatedValue;
+            if (! is_array($body) || ! isset($body['translations']) || ! is_array($body['translations'])) {
+                $this->logger->warning('Respuesta de traducción inválida o sin estructura esperada.');
+                continue;
+            }
+
+            $translations = [];
+            foreach ($body['translations'] as $original => $translated) {
+                $originalKey = is_string($original) ? $original : '';
+                $translatedValue = is_string($translated) ? $translated : '';
+                if ($originalKey !== '' && $translatedValue !== '') {
+                    $translations[$originalKey] = $translatedValue;
+                }
             }
 
             return $translations;
